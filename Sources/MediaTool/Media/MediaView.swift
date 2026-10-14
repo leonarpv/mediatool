@@ -2,40 +2,6 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-final class AppState: ObservableObject {
-    static let shared = AppState()
-    @Published var openedURLs: [URL] = []
-}
-
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    func application(_ application: NSApplication, open urls: [URL]) {
-        NSApp.activate(ignoringOtherApps: true)
-        AppState.shared.openedURLs = urls
-        // Safety net: if the system ended up creating more than one window
-        // for this file-open event, keep only the first one.
-        DispatchQueue.main.async {
-            let windows = NSApp.windows.filter { $0.isVisible }
-            if windows.count > 1 {
-                for window in windows.dropFirst() {
-                    window.close()
-                }
-            }
-        }
-    }
-}
-
-@main
-struct MediaToolApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-        .windowResizability(.contentSize)
-    }
-}
-
 enum ProcessMode: String, CaseIterable, Identifiable {
     case compress = "Compress"
     case gif = "GIF"
@@ -60,7 +26,7 @@ enum Quality: String, CaseIterable, Identifiable {
     }
 }
 
-struct ContentView: View {
+struct MediaView: View {
     @ObservedObject private var appState = AppState.shared
     @State private var inputURLs: [URL] = []
     @State private var process: ProcessMode = .compress
@@ -173,7 +139,7 @@ struct ContentView: View {
             .border(Color.secondary.opacity(0.3))
         }
         .padding(20)
-        .frame(width: 480)
+        .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: appState.openedURLs) { newURLs in
             if !newURLs.isEmpty {
                 inputURLs = newURLs

@@ -41,7 +41,9 @@ MediaTool/
 ├── Package.swift                  # SwiftPM manifest: executable target "MediaTool", macOS 13+
 ├── build_app.sh                   # Builds + packages + ad-hoc signs -> ~/Desktop/MediaTool.app
 ├── Sources/MediaTool/
-│   └── MediaToolApp.swift         # Entire app: SwiftUI UI + ffmpeg pipeline logic
+│   ├── App/MediaToolApp.swift     # App entry, AppDelegate, sidebar (RootView)
+│   ├── Media/MediaView.swift      # Media Tool UI + ffmpeg pipeline logic
+│   └── Chat/                      # LAN chat: Bonjour discovery, TCP framing, history, views
 ├── .build/                        # swift build output (release binary lives here pre-packaging)
 └── .swiftpm/                      # Xcode/SwiftPM tooling metadata
 ```

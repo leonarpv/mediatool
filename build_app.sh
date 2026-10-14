@@ -7,7 +7,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 echo "🔨 Building (release)…"
 swift build -c release
 
-APP="/Users/leonarpv/Desktop/MediaTool.app"
+APP="$HOME/Desktop/MediaTool.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
@@ -39,6 +39,12 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
     <true/>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Media Tool finds other Macs on your local network to chat with them.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_mediatool._tcp</string>
+    </array>
 </dict>
 </plist>
 EOF
