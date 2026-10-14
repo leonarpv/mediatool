@@ -1,10 +1,10 @@
 #!/bin/bash
-# Compila el paquete Swift y lo empaqueta como MediaTool.app en el Escritorio.
+# Builds the Swift package and packages it as MediaTool.app on the Desktop.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-echo "🔨 Compilando (release)…"
+echo "🔨 Building (release)…"
 swift build -c release
 
 APP="/Users/leonarpv/Desktop/MediaTool.app"
@@ -43,8 +43,8 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 </plist>
 EOF
 
-echo "✍️  Firmando ad-hoc…"
+echo "✍️  Signing ad-hoc…"
 codesign --force --deep --sign - "$APP"
 
-echo "✅ Listo: $APP"
-echo "   (Primera vez: clic derecho -> Abrir, para saltar el aviso de Gatekeeper de app sin firma)"
+echo "✅ Done: $APP"
+echo "   (First time: right-click -> Open, to bypass the Gatekeeper warning for an unsigned app)"

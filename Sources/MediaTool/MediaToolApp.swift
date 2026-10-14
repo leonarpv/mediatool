@@ -11,8 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         NSApp.activate(ignoringOtherApps: true)
         AppState.shared.openedURLs = urls
-        // Salvaguarda: si el sistema llegó a crear más de una ventana para
-        // esta apertura de archivo, nos quedamos solo con la primera.
+        // Safety net: if the system ended up creating more than one window
+        // for this file-open event, keep only the first one.
         DispatchQueue.main.async {
             let windows = NSApp.windows.filter { $0.isVisible }
             if windows.count > 1 {
@@ -37,25 +37,25 @@ struct MediaToolApp: App {
 }
 
 enum ProcessMode: String, CaseIterable, Identifiable {
-    case compress = "Comprimir"
+    case compress = "Compress"
     case gif = "GIF"
-    case both = "Ambos"
+    case both = "Both"
     var id: String { rawValue }
 }
 
 enum Quality: String, CaseIterable, Identifiable {
-    case alta = "Alta"
-    case media = "Media"
-    case baja = "Baja"
-    case personalizada = "Personalizada"
+    case high = "High"
+    case medium = "Medium"
+    case low = "Low"
+    case custom = "Custom"
     var id: String { rawValue }
 
     var preset: (crf: Int, width: Int, fps: Int)? {
         switch self {
-        case .alta: return (18, 720, 20)
-        case .media: return (23, 480, 15)
-        case .baja: return (28, 320, 10)
-        case .personalizada: return nil
+        case .high: return (18, 720, 20)
+        case .medium: return (23, 480, 15)
+        case .low: return (28, 320, 10)
+        case .custom: return nil
         }
     }
 }
@@ -64,7 +64,7 @@ struct ContentView: View {
     @ObservedObject private var appState = AppState.shared
     @State private var inputURLs: [URL] = []
     @State private var process: ProcessMode = .compress
-    @State private var quality: Quality = .media
+    @State private var quality: Quality = .medium
     @State private var customCRF: Double = 23
     @State private var customWidth: Double = 480
     @State private var customFPS: Double = 15
@@ -86,7 +86,7 @@ struct ContentView: View {
                     Image(systemName: "film")
                         .font(.system(size: 28))
                     if inputURLs.isEmpty {
-                        Text("Arrastra video(s)/GIF aquí, o haz clic para elegir")
+                        Text("Drag video(s)/GIF here, or click to choose")
                             .multilineTextAlignment(.center)
                     } else {
                         Text(inputURLs.map { $0.lastPathComponent }.joined(separator: ", "))
@@ -106,7 +106,7 @@ struct ContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Proceso").font(.caption).foregroundStyle(.secondary)
+                Text("Process").font(.caption).foregroundStyle(.secondary)
                 Picker("", selection: $process) {
                     ForEach(ProcessMode.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -115,7 +115,7 @@ struct ContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Calidad").font(.caption).foregroundStyle(.secondary)
+                Text("Quality").font(.caption).foregroundStyle(.secondary)
                 Picker("", selection: $quality) {
                     ForEach(Quality.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -123,28 +123,28 @@ struct ContentView: View {
                 .labelsHidden()
             }
 
-            if quality == .personalizada {
+            if quality == .custom {
                 VStack(alignment: .leading, spacing: 8) {
                     Stepper(value: $customCRF, in: 0...51) {
-                        Text("CRF: \(Int(customCRF))  (menor = mejor calidad)")
+                        Text("CRF: \(Int(customCRF))  (lower = better quality)")
                     }
                     Stepper(value: $customWidth, in: 120...1920, step: 20) {
-                        Text("Ancho GIF: \(Int(customWidth)) px")
+                        Text("GIF width: \(Int(customWidth)) px")
                     }
                     Stepper(value: $customFPS, in: 5...30) {
-                        Text("FPS GIF: \(Int(customFPS))")
+                        Text("GIF FPS: \(Int(customFPS))")
                     }
                 }
                 .padding(.leading, 4)
             }
 
-            TextField("Prefijo (opcional)", text: $prefix)
+            TextField("Prefix (optional)", text: $prefix)
                 .textFieldStyle(.roundedBorder)
 
-            Toggle("Eliminar archivo(s) original(es) tras comprimir", isOn: $deleteOriginal)
+            Toggle("Delete original file(s) after compressing", isOn: $deleteOriginal)
 
             HStack {
-                Button(isRunning ? "Procesando…" : "Ejecutar") {
+                Button(isRunning ? "Processing…" : "Run") {
                     runPipeline()
                 }
                 .disabled(inputURLs.isEmpty || isRunning)
@@ -154,7 +154,7 @@ struct ContentView: View {
                     ProgressView().scaleEffect(0.6)
                 }
                 Spacer()
-                Button("Limpiar") {
+                Button("Clear") {
                     inputURLs = []
                     log = ""
                 }
@@ -162,7 +162,7 @@ struct ContentView: View {
             }
 
             ScrollView {
-                Text(log.isEmpty ? "El resultado aparecerá aquí…" : log)
+                Text(log.isEmpty ? "Results will appear here…" : log)
                     .font(.system(.footnote, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
@@ -262,14 +262,14 @@ struct ContentView: View {
             }
             return task.terminationStatus == 0
         } catch {
-            appendLog("❌ Error ejecutando ffmpeg: \(error.localizedDescription)")
+            appendLog("❌ Error running ffmpeg: \(error.localizedDescription)")
             return false
         }
     }
 
     private func runPipeline() {
         guard let ffmpegPath = findFFmpeg() else {
-            appendLog("❌ No se encontró ffmpeg. Instálalo con: brew install ffmpeg")
+            appendLog("❌ ffmpeg not found. Install it with: brew install ffmpeg")
             return
         }
 
@@ -288,7 +288,7 @@ struct ContentView: View {
         }
 
         let dir = outputDirectory()
-        appendLog("📁 Carpeta de salida: \(dir.path)\n")
+        appendLog("📁 Output folder: \(dir.path)\n")
 
         DispatchQueue.global(qos: .userInitiated).async {
             for input in filesToProcess {
@@ -297,26 +297,26 @@ struct ContentView: View {
                 let outname = pfx.isEmpty ? name : "\(pfx)_\(name)"
                 let origBytes = fileSize(input)
 
-                appendLog("📂 Procesando: \(input.lastPathComponent) (\(humanSize(origBytes)))")
+                appendLog("📂 Processing: \(input.lastPathComponent) (\(humanSize(origBytes)))")
 
                 var compressedOutput: URL? = nil
 
                 func report(_ label: String, _ out: URL) {
                     guard FileManager.default.fileExists(atPath: out.path) else {
-                        appendLog("❌ Error: no se generó '\(out.lastPathComponent)'")
+                        appendLog("❌ Error: '\(out.lastPathComponent)' was not generated")
                         return
                     }
                     let newBytes = fileSize(out)
                     let diff = origBytes - newBytes
                     let pct = origBytes > 0 ? (Double(diff) / Double(origBytes)) * 100 : 0
                     appendLog("✅ \(label): \(out.lastPathComponent)")
-                    appendLog("   Tamaño: \(humanSize(newBytes))  (original: \(humanSize(origBytes)), reducción: \(String(format: "%.1f", pct))%)")
+                    appendLog("   Size: \(humanSize(newBytes))  (original: \(humanSize(origBytes)), reduction: \(String(format: "%.1f", pct))%)")
                 }
 
                 if proc == .gif || proc == .both {
                     let palette = dir.appendingPathComponent("\(outname)_palette.png")
                     let out = dir.appendingPathComponent("\(outname).gif")
-                    appendLog("🎬 Generando GIF (ancho=\(width)px, fps=\(fps))…")
+                    appendLog("🎬 Generating GIF (width=\(width)px, fps=\(fps))…")
                     runFFmpeg(ffmpegPath, ["-loglevel", "warning", "-y", "-i", input.path,
                                            "-vf", "fps=\(fps),scale=\(width):-1:flags=lanczos,palettegen",
                                            palette.path])
@@ -324,22 +324,22 @@ struct ContentView: View {
                                            "-filter_complex", "fps=\(fps),scale=\(width):-1:flags=lanczos[x];[x][1:v]paletteuse",
                                            out.path])
                     try? FileManager.default.removeItem(at: palette)
-                    report("GIF generado", out)
+                    report("GIF generated", out)
                 }
 
                 if proc == .compress || proc == .both {
                     let out = dir.appendingPathComponent("\(outname)_compressed.\(ext)")
-                    appendLog("🎞️ Comprimiendo (crf=\(crf))…")
+                    appendLog("🎞️ Compressing (crf=\(crf))…")
                     let ok = runFFmpeg(ffmpegPath, ["-loglevel", "warning", "-y", "-i", input.path,
                                                     "-c:v", "libx264", "-c:a", "copy", "-crf", "\(crf)",
                                                     out.path])
                     if ok { compressedOutput = out }
-                    report("Video comprimido", out)
+                    report("Video compressed", out)
                 }
 
                 if delOriginal, compressedOutput != nil {
                     try? FileManager.default.removeItem(at: input)
-                    appendLog("🗑️ Original eliminado: \(input.lastPathComponent)")
+                    appendLog("🗑️ Original deleted: \(input.lastPathComponent)")
                 }
 
                 appendLog("")

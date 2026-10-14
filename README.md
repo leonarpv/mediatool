@@ -60,26 +60,26 @@ MediaTool/
 
 1. Open `MediaTool.app`.
 2. Drag one or more video/GIF files onto the drop zone (or click it to open a file picker). The app can also be opened directly with a file already loaded — via `open -a MediaTool.app file.mov`, or automatically via the [screen-recording automation](#automate-auto-open-after-a-screen-recording) below.
-3. Pick Process (Compress / GIF / Both) and Quality (Alta / Media / Baja / Personalizada — custom CRF, GIF width, GIF fps), plus an optional output prefix.
+3. Pick Process (Compress / GIF / Both) and Quality (High / Medium / Low / Custom — custom CRF, GIF width, GIF fps), plus an optional output prefix.
 4. Toggle "delete originals after compressing" if desired.
-5. Click **Ejecutar**. Progress and results stream into the log pane at the bottom.
+5. Click **Run**. Progress and results stream into the log pane at the bottom.
 
 > **Note:** Finder's right-click **"Open With → Media Tool"** does *not* list the app. Early on it did (via `CFBundleDocumentTypes` in `Info.plist`), but that declaration made macOS spawn an extra document window on every file-open in addition to the one our own handler populates — a duplicate-window bug. Removing it fixed the duplicate window at the cost of that Finder menu entry. Drag-and-drop, the file picker, `open -a`, and the Folder Action automation are unaffected and are the supported ways to hand it a file.
 
 ## Quality presets
 
-| Quality       | CRF | GIF width | GIF fps |
-|---------------|-----|-----------|---------|
-| Alta          | 18  | 720 px    | 20      |
-| Media         | 23  | 480 px    | 15      |
-| Baja          | 28  | 320 px    | 10      |
-| Personalizada | custom | custom | custom |
+| Quality | CRF | GIF width | GIF fps |
+|---------|-----|-----------|---------|
+| High    | 18  | 720 px    | 20      |
+| Medium  | 23  | 480 px    | 15      |
+| Low     | 28  | 320 px    | 10      |
+| Custom  | custom | custom | custom |
 
 Lower CRF = better quality / larger file.
 
 ## Automate: auto-open after a screen recording
 
-macOS's built-in screen recorder (**Cmd+Shift+5**) saves each recording as `Screen Recording <date> at <time>.mov`, by default straight to `~/Desktop`. This automation watches that folder and, the instant a new recording lands, opens it directly in `MediaTool.app` — pre-loaded in the drop zone, ready for you to pick Process/Quality/prefix and click **Ejecutar**. It does **not** auto-run the compression — you still choose settings per recording.
+macOS's built-in screen recorder (**Cmd+Shift+5**) saves each recording as `Screen Recording <date> at <time>.mov`, by default straight to `~/Desktop`. This automation watches that folder and, the instant a new recording lands, opens it directly in `MediaTool.app` — pre-loaded in the drop zone, ready for you to pick Process/Quality/prefix and click **Run**. It does **not** auto-run the compression — you still choose settings per recording.
 
 It's built on **Folder Actions**, a native macOS mechanism where a folder has a script attached to it that fires whenever a new item is added — no polling, no login item, no background daemon of our own.
 
