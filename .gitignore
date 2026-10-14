@@ -2,3 +2,5 @@
 .DS_Store
 xcuserdata/
 *.xcuserstate
+*.swp
+*.swo
