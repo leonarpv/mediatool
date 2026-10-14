@@ -57,6 +57,13 @@ struct ChatMessage: Codable, Identifiable, Hashable {
     let text: String
     let sentAt: Date
     var status: Status
+    var attachment: Attachment? = nil
+}
+
+/// A file sent along with a message. The bytes live on disk, see `ChatStore.fileURL(for:)`.
+struct Attachment: Codable, Hashable {
+    let fileName: String
+    let size: Int
 }
 
 /// Message exchanged over the wire, framed as a 4-byte big-endian length + JSON payload.
@@ -66,6 +73,7 @@ struct WireMessage: Codable {
     enum Kind: String, Codable {
         case hello  // first message on every connection: who am I
         case text
+        case file   // `fileName` + `fileData`, sent in a single frame
         case ack    // confirms receipt of `messageID`
     }
 
@@ -76,4 +84,6 @@ struct WireMessage: Codable {
     var messageID: UUID? = nil
     var text: String? = nil
     var sentAt: Date? = nil
+    var fileName: String? = nil
+    var fileData: Data? = nil
 }

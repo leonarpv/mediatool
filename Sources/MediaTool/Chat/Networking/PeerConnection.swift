@@ -4,7 +4,8 @@ import Network
 /// Wraps an `NWConnection` with length-prefixed JSON framing.
 /// All callbacks run on the queue passed to `start(queue:)`.
 final class PeerConnection {
-    private static let maxFrameSize = 1 << 20
+    /// Fits `ChatStore.maxFileSize` once base64-encoded inside the JSON frame.
+    private static let maxFrameSize = 16 << 20
 
     let connection: NWConnection
     let isOutgoing: Bool

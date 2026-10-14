@@ -47,6 +47,7 @@ struct RootView: View {
     @EnvironmentObject private var chat: ChatStore
     @ObservedObject private var appState = AppState.shared
     @State private var selection: SidebarItem? = .media
+    @State private var peerToRemove: Peer?
 
     var body: some View {
         NavigationSplitView {
@@ -65,10 +66,26 @@ struct RootView: View {
                                 status: chat.status(of: peer.id),
                                 unread: chat.unread[peer.id] ?? 0)
                             .tag(SidebarItem.peer(peer.id))
+                            .contextMenu {
+                                Button("Remove \(peer.name)…", role: .destructive) { peerToRemove = peer }
+                            }
                     }
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+            .confirmationDialog("Remove \(peerToRemove?.name ?? "")?",
+                                isPresented: Binding(get: { peerToRemove != nil },
+                                                     set: { if !$0 { peerToRemove = nil } }),
+                                presenting: peerToRemove) { peer in
+                Button("Remove", role: .destructive) {
+                    if selection == .peer(peer.id) { selection = .media }
+                    chat.removePeer(peer.id)
+                }
+            } message: { peer in
+                Text(chat.status(of: peer.id) == .offline
+                     ? "Its chat history and shared files will be deleted from this Mac."
+                     : "Its chat history and shared files will be deleted from this Mac. It is still on the network, so it will stay in the list.")
+            }
         } detail: {
             switch selection {
             case .peer(let id):

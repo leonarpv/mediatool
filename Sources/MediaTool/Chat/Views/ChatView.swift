@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct PeerRow: View {
     let peer: Peer
@@ -47,6 +48,8 @@ struct ChatView: View {
     @EnvironmentObject private var chat: ChatStore
     let peerID: String
     @State private var draft = ""
+    @State private var isDropTargeted = false
+    @State private var errorMessage: String?
 
     private var messages: [ChatMessage] { chat.messages[peerID] ?? [] }
     private var trimmedDraft: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -72,8 +75,13 @@ struct ChatView: View {
                 }
             }
             Divider()
-            HStack(spacing: 8) {
-                TextField("Message", text: $draft)
+            HStack(alignment: .bottom, spacing: 8) {
+                Button(action: chooseFiles) {
+                    Image(systemName: "paperclip")
+                }
+                .help("Attach files (up to \(ByteCountFormatter.string(fromByteCount: Int64(ChatStore.maxFileSize), countStyle: .file)) each)")
+                TextField("Message — Markdown supported, ⌥↩ for a new line", text: $draft, axis: .vertical)
+                    .lineLimit(1...8)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(send)
                 Button(action: send) {
@@ -81,8 +89,61 @@ struct ChatView: View {
                 }
                 .disabled(trimmedDraft.isEmpty)
             }
+            .buttonStyle(.borderless)
             .padding(10)
         }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6]))
+                    .padding(6)
+            }
+        }
+        .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
+            loadDroppedFiles(providers)
+            return true
+        }
+        .alert("Couldn't send file", isPresented: Binding(get: { errorMessage != nil },
+                                                          set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func chooseFiles() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.prompt = "Send"
+        if panel.runModal() == .OK {
+            sendFiles(panel.urls)
+        }
+    }
+
+    private func loadDroppedFiles(_ providers: [NSItemProvider]) {
+        var urls: [URL] = []
+        let group = DispatchGroup()
+        for provider in providers {
+            group.enter()
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                if let url { DispatchQueue.main.async { urls.append(url) } }
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) { sendFiles(urls) }
+    }
+
+    private func sendFiles(_ urls: [URL]) {
+        var failures: [String] = []
+        for url in urls {
+            do {
+                try chat.sendFile(at: url, to: peerID)
+            } catch {
+                failures.append(error.localizedDescription)
+            }
+        }
+        if !failures.isEmpty { errorMessage = failures.joined(separator: "\n") }
     }
 
     private var header: some View {
@@ -113,15 +174,21 @@ struct MessageBubble: View {
         HStack {
             if message.fromMe { Spacer(minLength: 60) }
             VStack(alignment: message.fromMe ? .trailing : .leading, spacing: 2) {
-                Text(message.text)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .foregroundColor(message.fromMe ? .white : .primary)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(message.fromMe ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
-                    )
+                if let attachment = message.attachment {
+                    AttachmentView(message: message, attachment: attachment)
+                }
+                if !message.text.isEmpty {
+                    MarkdownText(source: message.text)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .foregroundColor(message.fromMe ? .white : .primary)
+                        .tint(message.fromMe ? .white : .accentColor)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(message.fromMe ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                        )
+                }
                 HStack(spacing: 4) {
                     Text(message.sentAt, style: .time)
                     if message.fromMe {
