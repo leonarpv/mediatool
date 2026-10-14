@@ -38,10 +38,18 @@ struct Peer: Codable, Identifiable, Hashable {
     var lastSeen: Date?
 }
 
-enum PeerStatus {
-    case offline      // known from history, not visible on the network
-    case discovered   // advertised via Bonjour, not connected yet
-    case connected    // handshake done, messages flow
+enum PeerStatus: Equatable {
+    case offline                          // known from history, not visible on the network
+    case discovered                       // advertised via Bonjour, not connected yet
+    case connecting
+    case retrying(attempt: Int, at: Date)
+    case connected(since: Date)           // handshake done, messages flow
+    case unstable(since: Date)            // connected, but the network path is down right now
+
+    var isConnected: Bool {
+        if case .connected = self { return true }
+        return false
+    }
 }
 
 struct ChatMessage: Codable, Identifiable, Hashable {

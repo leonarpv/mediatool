@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 /// UI-facing chat state: known peers, their status, and message history.
 /// Lives on the main thread; networking is delegated to `PeerService`.
@@ -21,7 +22,8 @@ final class ChatStore: ObservableObject {
     @Published private(set) var messages: [String: [ChatMessage]] = [:]
     @Published private(set) var unread: [String: Int] = [:]
     @Published private var discovered: Set<String> = []
-    @Published private var connected: Set<String> = []
+    @Published private var links: [String: LinkState] = [:]
+    private var wakeObserver: NSObjectProtocol?
 
     /// The peer whose chat is currently open; its messages don't count as unread.
     var activePeerID: String? {
@@ -51,21 +53,49 @@ final class ChatStore: ObservableObject {
             self?.upsertPeer(id: id, name: name)
         }
         service.onPeerLost = { [weak self] id in
-            self?.discovered.remove(id)
+            guard let self else { return }
+            self.discovered.remove(id)
+            if self.peers[id] != nil {
+                self.peers[id]?.lastSeen = Date()
+                self.savePeers()
+            }
         }
         service.onPeerConnected = { [weak self] id, name in
             guard let self else { return }
-            self.connected.insert(id)
             self.upsertPeer(id: id, name: name)
             self.flushPending(to: id)
         }
-        service.onPeerDisconnected = { [weak self] id in
-            self?.connected.remove(id)
+        service.onLinkStateChanged = { [weak self] id, state in
+            self?.links[id] = state
         }
         service.onMessage = { [weak self] from, message in
             self?.handle(message, from: from)
         }
         service.start()
+
+        // Sockets don't survive sleep well; reconnect as soon as the Mac wakes up.
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.refresh()
+        }
+    }
+
+    deinit {
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+    }
+
+    /// Restarts discovery and reconnects to every visible peer.
+    func refresh() {
+        service.refresh()
+    }
+
+    /// Drops and re-establishes the connection to one peer.
+    func reconnect(_ peerID: String) {
+        service.reconnect(peerID)
+    }
+
+    func pendingCount(for peerID: String) -> Int {
+        messages[peerID]?.filter { $0.status == .pending }.count ?? 0
     }
 
     var sortedPeers: [Peer] {
@@ -77,9 +107,13 @@ final class ChatStore: ObservableObject {
     }
 
     func status(of peerID: String) -> PeerStatus {
-        if connected.contains(peerID) { return .connected }
-        if discovered.contains(peerID) { return .discovered }
-        return .offline
+        switch links[peerID] {
+        case .connected(let since): return .connected(since: since)
+        case .unstable(let since): return .unstable(since: since)
+        case .connecting: return .connecting
+        case .retrying(let attempt, let at): return .retrying(attempt: attempt, at: at)
+        case .idle, nil: return discovered.contains(peerID) ? .discovered : .offline
+        }
     }
 
     func send(_ text: String, to peerID: String) {

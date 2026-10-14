@@ -30,16 +30,30 @@ extension PeerStatus {
     var color: Color {
         switch self {
         case .connected: return .green
-        case .discovered: return .orange
+        case .unstable: return .yellow
+        case .discovered, .connecting, .retrying: return .orange
         case .offline: return .gray.opacity(0.5)
         }
     }
 
-    var label: String {
+    /// Human-readable status; `now` drives the retry countdown.
+    func label(now: Date, lastSeen: Date?) -> String {
         switch self {
-        case .connected: return "Connected"
-        case .discovered: return "Connecting…"
-        case .offline: return "Offline — messages will be sent when it reconnects"
+        case .connected(let since):
+            return "Connected since \(since.formatted(date: .omitted, time: .shortened))"
+        case .unstable:
+            return "Connection unstable — waiting for the network…"
+        case .connecting:
+            return "Connecting…"
+        case .retrying(let attempt, let at):
+            let seconds = max(0, Int(at.timeIntervalSince(now).rounded(.up)))
+            return "Connection lost — retrying in \(seconds)s (attempt \(attempt))"
+        case .discovered:
+            return "On the network — waiting for connection…"
+        case .offline:
+            guard let lastSeen else { return "Offline" }
+            let relative = RelativeDateTimeFormatter().localizedString(for: lastSeen, relativeTo: now)
+            return "Offline — last seen \(relative)"
         }
     }
 }
@@ -148,13 +162,33 @@ struct ChatView: View {
 
     private var header: some View {
         let status = chat.status(of: peerID)
+        let pending = chat.pendingCount(for: peerID)
         return HStack(spacing: 8) {
             Circle().fill(status.color).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text(chat.peers[peerID]?.name ?? "Unknown Mac").font(.headline)
-                Text(status.label).font(.caption).foregroundStyle(.secondary)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(status.label(now: context.date, lastSeen: chat.peers[peerID]?.lastSeen))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                if pending > 0 {
+                    Text("\(pending) message\(pending == 1 ? "" : "s") waiting to be delivered")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
             }
             Spacer()
+            if status == .connecting {
+                ProgressView().controlSize(.small)
+            }
+            Button {
+                chat.reconnect(peerID)
+            } label: {
+                Label("Reconnect", systemImage: "arrow.clockwise")
+            }
+            .disabled(status == .connecting)
+            .help("Drop the current connection and connect again")
         }
         .padding(12)
     }

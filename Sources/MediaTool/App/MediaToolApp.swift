@@ -67,12 +67,24 @@ struct RootView: View {
                                 unread: chat.unread[peer.id] ?? 0)
                             .tag(SidebarItem.peer(peer.id))
                             .contextMenu {
+                                Button("Reconnect") { chat.reconnect(peer.id) }
+                                Divider()
                                 Button("Remove \(peer.name)…", role: .destructive) { peerToRemove = peer }
                             }
                     }
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+            .toolbar {
+                ToolbarItem {
+                    Button {
+                        chat.refresh()
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .help("Search the network again and reconnect to every Mac")
+                }
+            }
             .confirmationDialog("Remove \(peerToRemove?.name ?? "")?",
                                 isPresented: Binding(get: { peerToRemove != nil },
                                                      set: { if !$0 { peerToRemove = nil } }),

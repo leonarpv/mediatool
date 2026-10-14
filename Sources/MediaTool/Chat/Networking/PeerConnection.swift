@@ -11,9 +11,12 @@ final class PeerConnection {
     let isOutgoing: Bool
     /// Set once the peer's `hello` arrives.
     var peerID: String?
+    /// Set when this becomes the active connection for `peerID`.
+    var connectedSince: Date?
 
     var onReady: ((PeerConnection) -> Void)?
     var onMessage: ((PeerConnection, WireMessage) -> Void)?
+    var onViabilityChange: ((PeerConnection, Bool) -> Void)?
     var onClose: ((PeerConnection) -> Void)?
 
     private var buffer = Data()
@@ -39,6 +42,11 @@ final class PeerConnection {
             default:
                 break
             }
+        }
+        connection.viabilityUpdateHandler = { [weak self] isViable in
+            guard let self else { return }
+            PeerService.debug("connection \(self.peerID ?? "?") viable: \(isViable)")
+            self.onViabilityChange?(self, isViable)
         }
         connection.start(queue: queue)
         receiveNext()
